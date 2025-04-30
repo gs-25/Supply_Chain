@@ -1,0 +1,376 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{subfig}
+\usepackage{listings}
+\usepackage{xcolor}
+
+% Define code listing style
+\lstset{
+    language=Python,
+    basicstyle=\small\ttfamily,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny,
+    numbersep=5pt,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!60!black},
+    stringstyle=\color{red},
+    showstringspaces=false,
+    backgroundcolor=\color{gray!10},
+    captionpos=b
+}
+
+\title{Supply Chain Demand Forecasting Analysis}
+\author{GURJOT SINGH BAJAJ \\ Roll Number: 22124040}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+This project focuses on developing a comprehensive supply chain demand forecasting system using advanced time series analysis techniques. The primary goal is to analyze and predict product demand patterns across different categories while incorporating seasonal trends and market variations. The analysis aims to provide actionable insights for inventory management and supply chain optimization.
+
+\subsection{Dataset}
+The analysis utilizes the Supermart Grocery Sales Retail Analytics Dataset from Kaggle, which contains detailed sales data including:
+\begin{itemize}
+    \item Order details (ID, date)
+    \item Product categories and subcategories
+    \item Regional information
+    \item Sales metrics (amount, discount, profit)
+    \item Temporal coverage: 2015-2018
+    \item Multiple regions across Tamil Nadu, India
+\end{itemize}
+
+The dataset is publicly available at: \url{https://www.kaggle.com/datasets/mohamedharris/supermart-grocery-sales-retail-analytics-dataset?resource=download}
+
+\section{Methodology}
+\subsection{Tools and Technologies}
+The project employs several Python libraries and statistical techniques:
+\begin{itemize}
+    \item \textbf{Pandas}: For data manipulation and time series handling
+    \item \textbf{Statsmodels}: For implementing SARIMA (Seasonal ARIMA) models
+    \item \textbf{Scikit-learn}: For model evaluation metrics
+    \item \textbf{Matplotlib \& Seaborn}: For data visualization
+\end{itemize}
+
+\subsection{Analysis Components}
+\subsubsection{1. Seasonal Analysis}
+\begin{itemize}
+    \item Definition of seasons (based on Indian climate):
+        \begin{itemize}
+            \item Winter: December, January, February
+            \item Summer: March, April, May
+            \item Monsoon: June, July, August, September
+            \item Post-Monsoon: October, November
+        \end{itemize}
+    \item Calculation of seasonal sales distribution
+    \item Analysis of category-wise seasonal performance
+    \item Identification of peak and low seasons for each category
+\end{itemize}
+
+\subsubsection{2. Time Series Analysis}
+\begin{itemize}
+    \item Monthly sales aggregation to reduce daily noise
+    \item Year-over-year comparison for trend identification
+    \item Seasonal pattern identification and quantification
+    \item Trend analysis for long-term growth/decline
+\end{itemize}
+
+\subsubsection{3. Demand Forecasting}
+\begin{itemize}
+    \item SARIMA modeling with parameters (1,1,1) for non-seasonal and (1,1,1,12) for seasonal components
+    \item Train-test split (80-20) for model validation
+    \item Performance evaluation using MSE and MAE metrics
+    \item Forward forecasting for future demand prediction
+\end{itemize}
+
+\section{Code Implementation}
+This section presents key code snippets that demonstrate the implementation of our analysis pipeline.
+
+\subsection{Data Preprocessing and Seasonal Analysis}
+The following code shows how we process the data and perform seasonal analysis:
+
+\begin{lstlisting}[caption=Data Preprocessing and Seasonal Analysis]
+# Function to determine season based on month
+def get_season(date):
+    month = date.month
+    if month in [12, 1, 2]:
+        return 'Winter'
+    elif month in [3, 4, 5]:
+        return 'Summer'
+    elif month in [6, 7, 8, 9]:
+        return 'Monsoon'
+    else:
+        return 'Post-Monsoon'
+
+# Add season column
+df['Season'] = df['Order Date'].apply(get_season)
+
+# Calculate seasonal metrics
+seasonal_analysis = data.groupby(['Category', 'Season'])['Sales'].agg([
+    ('Total Sales', 'sum'),
+    ('Average Daily Sales', 'mean'),
+    ('Number of Orders', 'count')
+]).reset_index()
+\end{lstlisting}
+
+\subsection{Time Series Analysis}
+The time series analysis implementation includes monthly aggregation and visualization:
+
+\begin{lstlisting}[caption=Time Series Analysis Implementation]
+def analyze_time_series(data, category):
+    # Aggregate data by month
+    monthly_data = data[data['Category'] == category].set_index('Order Date')
+    monthly_data = monthly_data['Sales'].resample('M').sum()
+    
+    # Create the plot
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(15, 12))
+    
+    # Plot 1: Monthly Sales
+    ax1.plot(monthly_data.index, monthly_data.values, marker='o')
+    ax1.set_title(f'Monthly Sales - {category}')
+    
+    # Plot 2: Year-over-Year Comparison
+    years = monthly_data.index.year.unique()
+    for year in years:
+        year_data = monthly_data[monthly_data.index.year == year]
+        ax2.plot(range(1, 13), year_data.values[:12], 
+                marker='o', label=str(year))
+    
+    # Plot 3: Seasonal Pattern
+    seasonal_avg = monthly_data.groupby(monthly_data.index.month).mean()
+    ax3.plot(range(1, 13), seasonal_avg.values, marker='o', color='green')
+\end{lstlisting}
+
+\subsection{Forecasting Model}
+The SARIMA model implementation for demand forecasting:
+
+\begin{lstlisting}[caption=SARIMA Model Implementation]
+def build_sarima_model(data, category):
+    # Aggregate data by month
+    monthly_data = data[data['Category'] == category].set_index('Order Date')
+    monthly_data = monthly_data['Sales'].resample('M').sum()
+    
+    # Split data into train and test sets
+    train_size = int(len(monthly_data) * 0.8)
+    train_data = monthly_data[:train_size]
+    test_data = monthly_data[train_size:]
+    
+    # Build SARIMA model
+    model = SARIMAX(train_data,
+                    order=(1, 1, 1),
+                    seasonal_order=(1, 1, 1, 12))
+    results = model.fit()
+    
+    # Make predictions
+    forecast = results.forecast(steps=len(test_data))
+    
+    # Calculate metrics
+    mse = mean_squared_error(test_data, forecast)
+    mae = mean_absolute_error(test_data, forecast)
+\end{lstlisting}
+
+\subsection{Visualization and Output Management}
+The code for managing visualizations and saving outputs:
+
+\begin{lstlisting}[caption=Visualization and Output Management]
+def save_plot(fig, filename):
+    """Save plot to output directory with consistent styling"""
+    output_path = os.path.join('output', filename)
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close(fig)
+
+# Create output directory if it doesn't exist
+os.makedirs('output', exist_ok=True)
+
+# Set style for better visualizations
+plt.style.use('seaborn')
+sns.set_palette("husl")
+\end{lstlisting}
+
+\section{Implementation Process}
+When executing demand\_forecasting.py, the following steps are performed:
+
+\begin{enumerate}
+    \item \textbf{Data Preprocessing}
+    \begin{itemize}
+        \item Loading and cleaning the dataset
+        \item Converting dates to datetime format
+        \item Adding seasonal information
+        \item Handling missing values and outliers
+    \end{itemize}
+
+    \item \textbf{Seasonal Analysis}
+    \begin{itemize}
+        \item Calculating sales distribution across seasons
+        \item Generating heatmap visualization
+        \item Creating average sales comparison
+        \item Identifying category-specific seasonal patterns
+    \end{itemize}
+
+    \item \textbf{Time Series Analysis}
+    \begin{itemize}
+        \item Aggregating data to monthly level
+        \item Creating three-panel visualization:
+            \begin{itemize}
+                \item Monthly sales trend
+                \item Year-over-year comparison
+                \item Average seasonal pattern
+            \end{itemize}
+        \item Analyzing trend components
+    \end{itemize}
+
+    \item \textbf{Forecasting}
+    \begin{itemize}
+        \item Building SARIMA models for each category
+        \item Generating forecasts
+        \item Calculating error metrics
+        \item Validating predictions
+    \end{itemize}
+\end{enumerate}
+
+\section{Results}
+\subsection{Seasonal Patterns}
+The analysis revealed strong seasonal patterns across all product categories:
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{output/seasonal_analysis.png}
+    \caption{Seasonal Sales Distribution Heatmap - This visualization shows the percentage of total sales for each category across different seasons. Darker colors indicate higher sales percentages. Note the consistent high performance during the Monsoon season across all categories.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{output/seasonal_averages.png}
+    \caption{Average Sales by Season - Bar chart showing the overall sales performance across seasons. The Monsoon season shows significantly higher average sales, while Summer shows the lowest performance.}
+\end{figure}
+
+\begin{itemize}
+    \item \textbf{Monsoon Season Dominance}:
+    \begin{itemize}
+        \item Bakery: 37.19\% of annual sales (highest seasonal concentration)
+        \item Food Grains: 36.41\% (essential items showing strong seasonal pattern)
+        \item Fruits \& Veggies: 35.75\% (fresh produce peak)
+        \item Eggs, Meat \& Fish: 35.37\% (protein category seasonal peak)
+    \end{itemize}
+
+    \item \textbf{Seasonal Lows}:
+    \begin{itemize}
+        \item Summer: Most categories show lowest sales (19-21\%), possibly due to storage concerns
+        \item Winter: Some categories (Oil \& Masala, Beverages) show reduced performance
+    \end{itemize}
+\end{itemize}
+
+\subsection{Time Series Analysis}
+A detailed time series analysis was performed for each category. We present analyses for key categories:
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{output/time_series_Food Grains.png}
+    \caption{Time Series Analysis - Food Grains. Top panel shows overall trend, middle panel compares yearly patterns, and bottom panel shows average monthly pattern. Note the consistent seasonal peaks and increasing trend over years.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{output/time_series_Fruits & Veggies.png}
+    \caption{Time Series Analysis - Fruits \& Veggies. Shows higher volatility compared to Food Grains but maintains clear seasonal patterns. Note the pronounced peaks during monsoon months.}
+\end{figure}
+
+The visualizations reveal:
+\begin{itemize}
+    \item Clear monthly sales trends with consistent seasonal patterns
+    \item Year-over-year comparison showing growth in most categories
+    \item Distinct seasonal patterns in the average monthly sales
+    \item Different volatility levels across categories
+\end{itemize}
+
+\subsection{Forecasting Performance}
+Model performance varies significantly across categories:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lrr}
+\toprule
+Category & MSE & MAE \\
+\midrule
+Snacks & 146,785,086 & 10,539 \\
+Oil \& Masala & 156,291,153 & 10,248 \\
+Beverages & 219,008,593 & 13,651 \\
+Food Grains & 225,223,899 & 12,066 \\
+Fruits \& Veggies & 477,083,430 & 16,774 \\
+\bottomrule
+\end{tabular}
+\caption{Model Performance Metrics - Lower MSE and MAE indicate better forecast accuracy}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{output/forecast_Food Grains.png}
+    \caption{Sales Forecast - Food Grains. Blue shows historical data, green shows actual test data, and red shows model predictions. Note the model's ability to capture both trend and seasonal patterns.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{output/forecast_Snacks.png}
+    \caption{Sales Forecast - Snacks. Shows the best forecasting performance among all categories, with predictions closely matching actual values.}
+\end{figure}
+
+\section{Key Insights}
+\begin{enumerate}
+    \item \textbf{Strong Seasonal Patterns}:
+    \begin{itemize}
+        \item All categories show significant seasonal variation
+        \item Monsoon season consistently dominates sales volumes
+        \item Summer shows systematic decrease across categories
+    \end{itemize}
+    
+    \item \textbf{Category-Specific Trends}:
+    \begin{itemize}
+        \item Staples (Food Grains, Oil \& Masala) show stable patterns
+        \item Fresh categories (Fruits \& Veggies) show higher volatility
+        \item Processed foods (Snacks, Beverages) show moderate seasonality
+    \end{itemize}
+    
+    \item \textbf{Forecasting Effectiveness}:
+    \begin{itemize}
+        \item Best performance in stable categories (Snacks, Oil \& Masala)
+        \item Higher uncertainty in fresh produce categories
+        \item Seasonal patterns well-captured across all categories
+    \end{itemize}
+\end{enumerate}
+
+\section{Conclusion}
+The analysis provides valuable insights for supply chain optimization:
+\begin{itemize}
+    \item \textbf{Inventory Management}:
+    \begin{itemize}
+        \item Increase stock levels before monsoon season
+        \item Reduce inventory during summer months
+        \item Category-specific stocking strategies needed
+    \end{itemize}
+    
+    \item \textbf{Business Planning}:
+    \begin{itemize}
+        \item Align promotional activities with seasonal patterns
+        \item Adjust pricing strategies seasonally
+        \item Plan resource allocation based on predicted demand
+    \end{itemize}
+    
+    \item \textbf{Future Improvements}:
+    \begin{itemize}
+        \item Incorporate external factors (weather, events)
+        \item Develop category-specific forecasting models
+        \item Include price elasticity analysis
+    \end{itemize}
+\end{itemize}
+
+\end{document} 
